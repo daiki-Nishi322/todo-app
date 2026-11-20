@@ -4,16 +4,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Todo } from "@/lib/todo";
 
-// ① 一覧の取り方：GET /api/todos を fetch して、JSON を Todo[] として返す関数
-//    （async のアロー関数。fetch → res.json() を return）
+// 一覧を取る：GET /api/todos
 const getTodos = async (): Promise<Todo[]> => {
   const res = await fetch("/api/todos");
   return res.json();
 };
 
-// ===== ステップ5 =====
-// ⑤ 追加のしかた：POST /api/todos に { title } を送る関数
-//    （RAGボットの fetch と同じ形。method、headers、body を書く）
+// 追加する：POST /api/todos
 const addTodo = async (title: string): Promise<Todo> => {
   const res = await fetch("/api/todos", {
     method: "POST",
@@ -23,38 +20,54 @@ const addTodo = async (title: string): Promise<Todo> => {
   return res.json();
 };
 
+// ===== ステップ6b =====
+// ① 完了を切り替える：PATCH /api/todos/[id]
+//    URLに id を入れる。送る本文はないので body も headers もいらない
+const toggleTodo = async (id: number): Promise<Todo> => {
+  const res = await fetch(`/api/todos/${id}`, { method: "PATCH" });
+  return res.json();
+};
+
+// ② 削除する：DELETE /api/todos/[id]
+//    fetch は 400 や 404 でもエラーにならない（届いたので成功扱い）
+//    → res.ok（200番台なら true）を見て、だめなら throw でエラーにする。すると useMutation の onError が動く
+const deleteTodo = async (id: number) => {
+  const res = await fetch(`/api/todos/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(error);
+  }
+};
+
 export default function Home() {
-  // ② useQuery で一覧を取る。queryKey は ["todos"]、queryFn は ① の getTodos
-  //    戻り値から data と isLoading を取り出す（分割代入）
-  const todosQuery = useQuery({ queryKey: ["todos"], queryFn: getTodos });
-  const { data, isLoading } = todosQuery;
-
+  const { data, isLoading } = useQuery({ queryKey: ["todos"], queryFn: getTodos });
   const [text, setText] = useState("");
-
-  // ⑥ useQueryClient() で保管庫を取り出す（取り直しに使う）
   const queryClient = useQueryClient();
-  // ⑦ useMutation を作る
-  //    mutationFn：⑤ の addTodo
-  //    onSuccess：queryClient.invalidateQueries({ queryKey: ["todos"] }) で一覧を取り直す
 
-  const addMutation = useMutation({
-    mutationFn: addTodo,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["todos"] });
-    },
+  // 成功したら一覧を取り直す（3つの mutation で同じなので、関数にまとめた）
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["todos"] });
+  };
+
+  const addMutation = useMutation({ mutationFn: addTodo, onSuccess: refresh });
+
+  // ③ 切り替えと削除の mutation。形は addMutation と同じ
+  const toggleMutation = useMutation({ mutationFn: toggleTodo, onSuccess: refresh });
+  const deleteMutation = useMutation({
+    mutationFn: deleteTodo,
+    onSuccess: refresh,
+    onError: (error) => alert(error.message), // ④ throw したエラーの文言を表示する
   });
 
   const handleAdd = () => {
-    // ⑧ ⑦ の mutate(text) を呼んで送る。そのあと入力欄を空にする
     addMutation.mutate(text);
     setText("");
   };
 
-  // ③ 取得中なら「読み込み中…」を返す（早期リターン。discussion-view.tsx と同じ）
-
   if (isLoading) {
     return <p className="p-8">読み込み中...</p>;
   }
+
   return (
     <main className="p-8">
       <h1 className="text-2xl font-bold">TODO</h1>
@@ -68,9 +81,27 @@ export default function Home() {
       <button className="border" onClick={handleAdd}>
         追加
       </button>
+
       <ul>
         {data?.map((todo) => (
-          <li key={todo.id}>{todo.title}</li>
+          <li key={todo.id} className="flex gap-2">
+            {/* ⑤ チェックボックス：checked は今の状態。押されたら mutate(todo.id) */}
+            <input
+              type="checkbox"
+              checked={todo.completed}
+              onChange={() => toggleMutation.mutate(todo.id)}
+            />
+            {/* ⑥ 完了なら取り消し線（三項演算子） */}
+            <span className={todo.completed ? "line-through text-gray-400" : ""}>
+              {todo.title}
+            </span>
+            {/* ⑦ 削除ボタン：押されたら mutate(todo.id) */}
+            <button className="border px-1" onClick={() => {
+              if(!confirm("削除しますか？")) return;
+            deleteMutation.mutate(todo.id)}}>
+              削除
+            </button>
+          </li>
         ))}
       </ul>
     </main>
