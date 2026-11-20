@@ -2,25 +2,9 @@
 // ステップ8でデータベースに置き換えるまで、データはこの配列に入れておく
 
 import type { Todo } from "@/lib/todo";
+import { todos } from "@/lib/todo-store";
 
-// ① 最初から入っているTODOの配列（2〜3件。title は自由に）
-const todos: Todo[] = [
-  {
-    id: 1,
-    title: "読書",
-    completed: false,
-  },
-  {
-    id: 2,
-    title: "掃除",
-    completed: false,
-  },
-  {
-    id: 3,
-    title: "選択",
-    completed: false,
-  },
-];
+// ① TODOの配列は lib/todo-store.ts に移した（[id]/route.ts からも使うため）
 
 // ② GET を export する（async のアロー関数）。中で ① の配列を Response.json で返す
 
