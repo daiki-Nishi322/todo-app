@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Todo } from "@/lib/todo";
+import { TodoItem } from "@/components/todo-item";
 
 // 一覧を取る：GET /api/todos
 const getTodos = async (): Promise<Todo[]> => {
@@ -84,24 +85,9 @@ export default function Home() {
 
       <ul>
         {data?.map((todo) => (
-          <li key={todo.id} className="flex gap-2">
-            {/* ⑤ チェックボックス：checked は今の状態。押されたら mutate(todo.id) */}
-            <input
-              type="checkbox"
-              checked={todo.completed}
-              onChange={() => toggleMutation.mutate(todo.id)}
-            />
-            {/* ⑥ 完了なら取り消し線（三項演算子） */}
-            <span className={todo.completed ? "line-through text-gray-400" : ""}>
-              {todo.title}
-            </span>
-            {/* ⑦ 削除ボタン：押されたら mutate(todo.id) */}
-            <button className="border px-1" onClick={() => {
-              if(!confirm("削除しますか？")) return;
-            deleteMutation.mutate(todo.id)}}>
-              削除
-            </button>
-          </li>
+          <TodoItem key={todo.id} todo={todo}
+            onToggle={(id) => toggleMutation.mutate(id)}
+            onDelete={(id) => deleteMutation.mutate(id)} />
         ))}
       </ul>
     </main>
